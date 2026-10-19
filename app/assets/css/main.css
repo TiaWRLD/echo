@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+    --color-ink: #0B0A14;
+    --color-accent: #8B7BFF;
+    --color-accent-soft: #B7A9FF;
+    --font-sans: -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+}
+
+html, body {
+    background: radial-gradient(120% 80% at 50% 0%, #17142B 0%, #0B0A14 60%);
+    color: #ECEAFF;
+    font-family: var(--font-sans);
+    min-height: 100dvh;
+}
+
+.glass {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(24px);
+    border-radius: 1.5rem;
+}
