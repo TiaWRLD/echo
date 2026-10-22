@@ -95,6 +95,7 @@ export function useLLM() {
         } = {},
     ): Promise<string> {
         await load()
+        opts.signal?.throwIfAborted()
         if (status.value === 'generating') {
             throw new Error('A generation is already running')
         }

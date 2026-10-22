@@ -40,6 +40,7 @@ export function createTransformersEngine(): Engine {
     },
 
     async generate(messages: ChatMessage[], options: GenerateOptions, onToken, signal): Promise<string> {
+      if (signal.aborted) return ''
       if (!generator) throw new Error('ENGINE_NOT_LOADED')
 
       const stopping = new InterruptableStoppingCriteria()
@@ -65,6 +66,13 @@ export function createTransformersEngine(): Engine {
       })
 
       try {
+        if (import.meta.env.DEV) {
+          const formatted = generator.tokenizer.apply_chat_template(messages, {
+            tokenize: false,
+            add_generation_prompt: true,
+          })
+          console.info('[prompt]', formatted)
+        }
         await generator(messages, {
           max_new_tokens: options.maxTokens,
           do_sample: true,

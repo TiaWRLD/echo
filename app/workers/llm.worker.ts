@@ -2,6 +2,7 @@ import type { WorkerRequest, WorkerResponse } from './protocol'
 import { createEngine } from './engines'
 import type { Engine } from './engines/types'
 
+console.info('[engine]', import.meta.env.VITE_ENGINE)
 // Il motore si crea una volta sola (createEngine è async)
 let enginePromise: Promise<Engine> | null = null
 const getEngine = () => (enginePromise ??= createEngine())

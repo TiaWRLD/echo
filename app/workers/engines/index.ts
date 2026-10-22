@@ -1,15 +1,14 @@
 import type { Engine } from './types'
 
-// Import dinamici: Vite crea un chunk per motore e il worker scarica
-// solo quello scelto con VITE_ENGINE (mock | transformers | mediapipe).
-// ASSUNZIONE: il tuo mock esporta createMockEngine — adatta il nome se diverso.
 export async function createEngine(): Promise<Engine> {
   switch (import.meta.env.VITE_ENGINE) {
-    case 'transformers':
-      return (await import('./transformers')).createTransformersEngine()
+    case 'mock':
+      return (await import('./mock')).mockEngine
     case 'mediapipe':
       return (await import('./mediapipe')).createMediaPipeEngine()
+    case 'transformers':
     default:
-      return (await import('./mock')).createMockEngine()
+      return (await import('./transformers')).createTransformersEngine()
   }
 }
+
