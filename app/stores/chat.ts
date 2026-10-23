@@ -277,6 +277,13 @@ export const useChatStore = defineStore('chat', () => {
         startIfEmpty(mode.value)
     }
 
+    function resetAll() {
+        controller?.abort()
+        sessions.value = { vent: newSession(), reflect: newSession(), unblock: newSession() }
+        mode.value = 'vent'
+        error.value = null
+    }
+
     function setMode(m: Mode) {
         if (isSending.value || m === mode.value) return
         mode.value = m
@@ -286,6 +293,6 @@ export const useChatStore = defineStore('chat', () => {
     return {
         mode, messages, isSending, error,
         reflectDone, unblockReady, canShrink, canOfferReflect,
-        send, makeSmaller, stop, clear, setMode,
+        send, makeSmaller, stop, clear, resetAll, setMode,
     }
 })

@@ -57,6 +57,7 @@ watch(
           {{ m.label }}
         </button>
       </nav>
+      <PrivacyBadge />
     </header>
 
     <main class="flex-1 overflow-y-auto" aria-live="polite">
@@ -189,11 +190,14 @@ watch(
           </button>
         </div>
 
-        <div class="mt-2 flex items-center justify-between px-2 text-xs text-white/40">
+        <div class="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-2 text-xs text-white/40">
           <span>Echo is a space for reflection, not therapy.</span>
-          <button type="button" class="underline-offset-2 hover:underline" @click="chat.clear()">
-            Clear conversation
-          </button>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <button type="button" class="underline-offset-2 hover:underline" @click="chat.clear()">
+              Clear conversation
+            </button>
+            <DeleteAllData />
+          </div>
         </div>
       </div>
     </footer>
