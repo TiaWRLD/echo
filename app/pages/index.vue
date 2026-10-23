@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { linkify } from '~/utils/linkify'
 const chat = useChatStore()
 const { status, progress, error: llmError } = useLLM()
 
@@ -80,8 +81,19 @@ watch(
                         m.kind === 'crisis' && m.role === 'assistant' ? 'border-[#b7a9ff]/60' : '',
                     ]"
         >
-          {{ m.content }}
-        </div>
+          <template v-if="m.kind === 'crisis' && m.role === 'assistant'">
+            <template v-for="(part, i) in linkify(m.content)" :key="i">
+              <a
+                  v-if="part.href"
+                  :href="part.href"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-[#b7a9ff] underline underline-offset-2"
+              >{{ part.text }}</a>
+              <template v-else>{{ part.text }}</template>
+            </template>
+          </template>
+          <template v-else>{{ m.content }}</template>        </div>
 
         <div
             v-if="chat.canOfferReflect && !chat.isSending"
@@ -201,6 +213,7 @@ watch(
         </div>
       </div>
     </footer>
+    <OnboardingDialog />
   </div>
 </template>
 

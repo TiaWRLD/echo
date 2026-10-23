@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const chat = useChatStore()
 const journal = useJournalStore()
+const onboarding = useOnboardingStore()
 
 const confirming = ref(false)
 const busy = ref(false)
@@ -11,6 +12,7 @@ async function erase() {
   busy.value = true
   chat.resetAll()          // in-memory conversations
   await journal.wipe()     // diary in IndexedDB
+  onboarding.forget()     //onboarding seen data
   failed.value = Boolean(journal.error)
   done.value = !failed.value
   confirming.value = false
