@@ -1,22 +1,53 @@
 @import "tailwindcss";
 
-@theme {
+/* "static" = always emit these variables, even if no class uses them yet. */
+@theme static {
     --color-ink: #0B0A14;
+    --color-night: #17142B;
     --color-accent: #8B7BFF;
     --color-accent-soft: #B7A9FF;
+    --color-glow-blue: #3C50C8;
     --font-sans: -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+
+    /* Slow entrance for new bubbles and cards: class "animate-rise" */
+    --animate-rise: rise 900ms ease-out both;
+
+    @keyframes rise {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: none; }
+    }
 }
 
 html, body {
-    background: radial-gradient(120% 80% at 50% 0%, #17142B 0%, #0B0A14 60%);
+    background: radial-gradient(120% 80% at 50% 0%, var(--color-night) 0%, var(--color-ink) 60%);
     color: #ECEAFF;
     font-family: var(--font-sans);
     min-height: 100dvh;
 }
 
-.glass {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(24px);
-    border-radius: 1.5rem;
+/* Inside a layer, so utility classes (rounded-full, border-*, ...) can override these. */
+@layer components {
+    .glass {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(24px);
+        border-radius: 1.5rem;
+    }
+
+    /* Page background of the chat screen (moved here from index.vue) */
+    .echo-bg {
+        background:
+                radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--color-accent) 18%, transparent), transparent 55%),
+                radial-gradient(ellipse at 90% 100%, color-mix(in srgb, var(--color-glow-blue) 16%, transparent), transparent 50%),
+                var(--color-ink);
+    }
+}
+
+/* People who ask their system for less motion get none, orb included. */
+@media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }

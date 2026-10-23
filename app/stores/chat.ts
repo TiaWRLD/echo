@@ -13,8 +13,12 @@ import {
     STEP_SYSTEM, STEP_SHOTS, SMALLER_SYSTEM, SMALLER_SHOTS,
 } from '~/prompts/unblock'
 
-export type Mode = 'vent' | 'reflect' | 'unblock'
+import {
+    LETTER_INTRO, LETTER_RESULT_INTRO, LETTER_NOTE, LETTER_FALLBACK,
+    LETTER_SYSTEM, LETTER_SHOTS, MAX_LETTER_CHARS,
+} from '~/prompts/letter'
 
+export type Mode = 'vent' | 'reflect' | 'unblock' | 'letter'
 export interface UiMessage {
     id: number
     role: 'user' | 'assistant'
@@ -30,10 +34,12 @@ interface Session {
     answers: string[]      // Reflect / Unblock: answers collected so far
     microStep: string      // Unblock: the current micro-step
     shrinks: number        // Unblock: how many times "make it smaller" was used
+    source: string         // Letter: the text the person wrote (kept for "Try again")
+    letter: string         // Letter: the calm version, empty until it succeeds
 }
 
 const newSession = (): Session => ({
-    messages: [], turns: [], step: 0, answers: [], microStep: '', shrinks: 0,
+    messages: [], turns: [], step: 0, answers: [], microStep: '', shrinks: 0, source: '', letter: ''
 })
 
 const VENT_FOLLOW_UP = 'Want to add anything?'
@@ -45,6 +51,7 @@ const isCompleteStatement = (t: string) => /[.!]$/.test(t)
 
 // Shown the first time a flow mode is opened (and after "start over").
 const INTROS: Partial<Record<Mode, string>> = {
+    letter: LETTER_INTRO,
     reflect: `${REFLECT_INTRO}\n\n${REFLECT_QUESTIONS[0] ?? ''}`,
     unblock: `${UNBLOCK_INTRO}\n\n${UNBLOCK_QUESTIONS[0] ?? ''}`,
 }
@@ -57,6 +64,7 @@ export const useChatStore = defineStore('chat', () => {
         vent: newSession(),
         reflect: newSession(),
         unblock: newSession(),
+        letter: newSession(),
     })
     const isSending = ref(false)
     const error = ref<string | null>(null)
@@ -73,7 +81,9 @@ export const useChatStore = defineStore('chat', () => {
         () => mode.value === 'unblock' && session.value.step >= UNBLOCK_QUESTIONS.length,
     )
     const canShrink = computed(() => unblockReady.value && session.value.shrinks < MAX_SHRINKS)
-    // After ~3 exchanges in Vent, the UI offers to move to Reflect.
+    const letterStarted = computed(() => mode.value === 'letter' && session.value.source !== '')
+    const letterReady = computed(() => mode.value === 'letter' && session.value.letter !== '')
+    const letter = computed(() => session.value.letter)
     const canOfferReflect = computed(() => mode.value === 'vent' && session.value.turns.length >= 6)
 
     function add(s: Session, role: UiMessage['role'], content: string, kind: UiMessage['kind'] = 'normal'): UiMessage {
@@ -204,6 +214,32 @@ export const useChatStore = defineStore('chat', () => {
         return `${UNBLOCK_SMALLER_INTRO}\n\n${step}${note}`
     }
 
+    const LETTER_BAD =
+        /^(here('s| is)|sure|certainly|okay)\b|\b(send|sending|share)\s+(it|this|the (letter|message))\b|\byou (could|might|may|should) (send|share)\b/i
+
+    async function letterTurn(s: Session, reply: UiMessage, signal: AbortSignal): Promise<string | null> {
+        const raw = await llm.generate(
+            buildMessages(LETTER_SYSTEM, LETTER_SHOTS, [{ role: 'user', content: s.source }]),
+            { signal, onToken: (t) => { reply.content += t }, maxTokens: 220 },
+        )
+        // Stopped by the person: no result. s.source stays, so "Try again" works.
+        if (signal.aborted) return null
+
+        const letter = trimToSentences(raw.replace(/^["“\s]+|["”\s]+$/g, ''), 6)
+        if (!isCompleteStatement(letter) || letter.length < 30 || LETTER_BAD.test(letter)) {
+            s.letter = ''
+            return LETTER_FALLBACK
+        }
+        s.letter = letter
+        return `${LETTER_RESULT_INTRO}\n\n${letter}\n\n${LETTER_NOTE}`
+    }
+
+    async function retryLetter() {
+        if (!letterStarted.value || letterReady.value || isSending.value) return
+        const s = session.value
+        await run(s, 'Try again', (reply, signal) => letterTurn(s, reply, signal))
+    }
+
     // Shared by send() and makeSmaller(): bubbles, abort controller, errors.
     async function run(
         s: Session,
@@ -237,7 +273,7 @@ export const useChatStore = defineStore('chat', () => {
 
     async function send(text: string) {
         const userText = text.trim()
-        if (!userText || isSending.value || reflectDone.value || unblockReady.value) return
+        if (!userText || isSending.value || reflectDone.value || unblockReady.value || letterStarted.value) return
 
         const s = session.value
 
@@ -254,6 +290,11 @@ export const useChatStore = defineStore('chat', () => {
         await run(s, userText, (reply, signal) => {
             if (m === 'vent') return ventTurn(s, userText, reply, signal)
             if (m === 'reflect') return reflectTurn(s, userText, reply, signal)
+            if (m === 'letter') {
+                s.source = userText.slice(0, MAX_LETTER_CHARS)
+                s.letter = ''
+                return letterTurn(s, reply, signal)
+            }
             return unblockTurn(s, userText, reply, signal)
         })
     }
@@ -279,7 +320,7 @@ export const useChatStore = defineStore('chat', () => {
 
     function resetAll() {
         controller?.abort()
-        sessions.value = { vent: newSession(), reflect: newSession(), unblock: newSession() }
+        sessions.value = { vent: newSession(), reflect: newSession(), unblock: newSession(), letter: newSession() }
         mode.value = 'vent'
         error.value = null
     }

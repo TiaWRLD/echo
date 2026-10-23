@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { linkify } from '~/utils/linkify'
+import { MAX_LETTER_CHARS } from '~/prompts/letter'
 const chat = useChatStore()
-const { status, progress, error: llmError } = useLLM()
-
+const { status, progress, error: llmError, load } = useLLM()
+const gpu = useWebGPU()
 const modes = [
   { id: 'vent', label: 'Vent' },
   { id: 'reflect', label: 'Reflect' },
   { id: 'unblock', label: 'Unblock' },
+  {id: 'letter', label: 'Letter' },
 ] as const
 
 const input = ref('')
@@ -14,9 +16,33 @@ const bottom = ref<HTMLElement | null>(null)
 
 // Hide the empty placeholder bubble; the orb shows that Echo is working.
 const visibleMessages = computed(() => chat.messages.filter((m) => m.content))
-const errorText = computed(() => chat.error || llmError.value)
-const placeholders = { vent: "What's on your mind?", reflect: 'Your answer', unblock: 'Write it here' }
+// WebGPU missing: either the upfront check failed, or the engine reported it.
+const noGpu = computed(
+    () =>
+        gpu.supported.value === false ||
+        /WEBGPU_UNAVAILABLE/.test(`${llmError.value ?? ''} ${chat.error ?? ''}`),
+)
+// When the model failed to load, the friendly box below replaces the raw message.
+const errorText = computed(() => (status.value === 'error' ? null : chat.error || llmError.value))
+
+onMounted(() => { gpu.check() })
+
+function retryLoad() {
+  chat.error = null
+  load().catch(() => {}) // a new failure shows up again in the box
+}const placeholders = { vent: "What's on your mind?", reflect: 'Your answer', unblock: 'Write it here', letter: 'Write it as it is' }
 const placeholder = computed(() => placeholders[chat.mode])
+
+const copyState = ref<'idle' | 'done' | 'failed'>('idle')
+async function copyLetter() {
+  try {
+    await navigator.clipboard.writeText(chat.letter) // must run straight from the click
+    copyState.value = 'done'
+  } catch {
+    copyState.value = 'failed'
+  }
+  setTimeout(() => { copyState.value = 'idle' }, 2500)
+}
 function submit() {
   const text = input.value.trim()
   if (!text || chat.isSending) return
@@ -42,10 +68,11 @@ watch(
 
 <template>
   <div class="echo-bg h-dvh flex flex-col text-white/90">
+    <WebGPUUnsupported v-if="noGpu" />
+    <template v-else>
     <header class="shrink-0 flex flex-col items-center gap-4 pt-8 pb-4">
       <EchoOrb :active="chat.isSending" />
-      <nav class="glass flex gap-1 rounded-full p-1" aria-label="Mode">
-        <button
+      <nav class="glass flex max-w-full gap-1 overflow-x-auto rounded-full p-1" aria-label="Mode">        <button
             v-for="m in modes"
             :key="m.id"
             type="button"
@@ -56,7 +83,7 @@ watch(
             @click="chat.setMode(m.id)"
         >
           {{ m.label }}
-        </button>
+        </button >
       </nav>
       <PrivacyBadge />
     </header>
@@ -102,8 +129,7 @@ watch(
           <p>If you would like to look at this more closely, Reflect goes through it one step at a time.</p>
           <button
               type="button"
-              class="rounded-full border border-[#b7a9ff]/40 px-4 py-1.5"
-              @click="chat.setMode('reflect')"
+              class="whitespace-nowrap rounded-full px-5 py-1.5 text-sm transition-colors disabled:opacity-50"              @click="chat.setMode('reflect')"
           >
             Try Reflect
           </button>
@@ -117,6 +143,24 @@ watch(
                 :style="{ width: Math.round(progress * 100) + '%' }"
             />
           </div>
+        </div>
+
+        <div v-if="status === 'error'" class="glass self-start rounded-3xl px-5 py-4 text-sm">
+          <p>
+            Echo could not prepare the model. This can happen if the connection dropped during the
+            first download. Nothing you wrote has been sent anywhere.
+          </p>
+          <button
+              type="button"
+              class="mt-3 rounded-full bg-[#8b7bff] px-5 py-2 text-sm font-medium text-[#0b0a14]"
+              @click="retryLoad"
+          >
+            Try again
+          </button>
+          <details class="mt-3 text-xs text-white/50">
+            <summary class="cursor-pointer">Technical details</summary>
+            <p class="mt-1 break-words">{{ llmError }}</p>
+          </details>
         </div>
 
         <p v-if="errorText" class="self-start rounded-3xl border border-red-300/30 px-5 py-3 text-sm text-red-200">
@@ -174,6 +218,27 @@ watch(
           </template>
         </div>
 
+        <div v-else-if="chat.letterStarted" class="flex flex-wrap justify-center gap-3 py-2">
+          <button v-if="chat.isSending" type="button" class="rounded-full border border-white/20 px-5 py-2 text-sm" @click="chat.stop()">
+            Stop
+          </button>
+          <template v-else-if="chat.letterReady">
+            <button type="button" class="rounded-full bg-[#8b7bff] px-5 py-2 text-sm font-medium text-[#0b0a14]" @click="copyLetter">
+              {{ copyState === 'done' ? 'Copied' : 'Copy' }}
+            </button>
+            <button type="button" class="rounded-full border border-white/20 px-5 py-2 text-sm" @click="chat.clear()">Discard</button>
+          </template>
+          <template v-else>
+            <button type="button" class="rounded-full bg-[#8b7bff] px-5 py-2 text-sm font-medium text-[#0b0a14]" @click="chat.retryLetter()">
+              Try again
+            </button>
+            <button type="button" class="rounded-full border border-white/20 px-5 py-2 text-sm" @click="chat.clear()">Discard</button>
+          </template>
+          <p v-if="copyState === 'failed'" class="w-full text-center text-xs text-white/60">
+            Could not copy automatically. You can select the text and copy it by hand.
+          </p>
+        </div>
+
         <div v-else class="glass flex items-end gap-2 rounded-3xl p-2">
                     <textarea
                         v-model="input"
@@ -182,6 +247,7 @@ watch(
                         :placeholder="placeholder"
                         class="max-h-40 flex-1 resize-none bg-transparent px-3 py-2 outline-none placeholder:text-white/40"
                         @keydown.enter.exact="onEnter"
+                        :maxlength="chat.mode === 'letter' ? MAX_LETTER_CHARS : undefined"
                     />
           <button
               v-if="chat.isSending"
@@ -213,15 +279,8 @@ watch(
         </div>
       </div>
     </footer>
+    </template>
     <OnboardingDialog />
+    <UpdateNotice />
   </div>
 </template>
-
-<style scoped>
-.echo-bg {
-  background:
-      radial-gradient(ellipse at 20% 0%, rgba(139, 123, 255, 0.18), transparent 55%),
-      radial-gradient(ellipse at 90% 100%, rgba(60, 80, 200, 0.16), transparent 50%),
-      #0b0a14;
-}
-</style>

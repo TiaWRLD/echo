@@ -32,11 +32,6 @@ const close = () => dialog.value?.close()
       </p>
 
       <p>
-        Diary entries are saved only in this browser, on this device. They are not sent anywhere and
-        not backed up. If you clear your browser data, they are gone.
-      </p>
-
-      <p>
         <strong class="font-medium text-white">Check it yourself.</strong>
         Open your browser's developer tools and go to the Network tab. Send a message: no new request
         should appear. Once the model is downloaded, you can even turn off your internet and keep
@@ -46,7 +41,7 @@ const close = () => dialog.value?.close()
       <div class="flex flex-col gap-2 border-t border-white/10 pt-4">
         <DeleteAllData />
         <p class="text-xs text-white/50">
-          This removes your conversations and diary entries. The downloaded model stays, so you will
+          This removes your conversations. The downloaded model stays, so you will
           not need to download it again.
         </p>
       </div>
