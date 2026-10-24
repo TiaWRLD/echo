@@ -22,7 +22,10 @@ export default defineNuxtConfig({
     head: {
       title: 'Echo, a quiet place to think',
       htmlAttrs: { lang: 'en', class: 'dark' },
-      link: [{ rel: 'apple-touch-icon', href: `${base}apple-touch-icon-180x180.png` }],
+      link: [
+        { rel: 'icon', type: 'image/png', sizes: '32x32', href: `${base}favicon-32x32.png` },
+        { rel: 'apple-touch-icon', href: `${base}apple-touch-icon-180x180.png` },
+      ],
       meta: [
         { name: 'theme-color', content: '#0B0A14' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
@@ -46,6 +49,12 @@ export default defineNuxtConfig({
         {src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png'},
         {src: 'maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable'},
       ],
+    },
+    workbox: {
+      // Which built files go in the precache (what makes the app open offline)
+      globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,wasm}'],
+      // Workbox skips bigger files; the onnxruntime .wasm is certainly bigger than the default
+      maximumFileSizeToCacheInBytes: 40 * 1024 * 1024,
     },
   },
 })
