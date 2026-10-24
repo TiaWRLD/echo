@@ -30,7 +30,9 @@ jobs:
           NUXT_APP_BASE_URL: /echo/
           VITE_ENGINE: transformers
       - name: Check service worker base path
-        run: grep -q 'createHandlerBoundToURL("/echo/")' .output/public/sw.js
+        run: |
+          grep -q 'createHandlerBoundToURL("/echo/")' .output/public/sw.js
+          grep -q 'url:"/echo/"' .output/public/sw.js
       - uses: actions/upload-pages-artifact@v5
         with:
           path: .output/public
